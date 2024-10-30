@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jogo da Velha 3</title>
+  <style>
+    /* Tema Escuro */
+    body { 
+      font-family: Arial, sans-serif; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      background-color: #1c1c1c; 
+      color: #ffffff;
+      min-height: 100vh; 
+      margin: 0; 
+      padding: 0;
+    }
+    h1 { 
+      text-align: center; 
+      color: #f0f0f0; 
+      margin-top: 20px; 
+      font-size: 2.5em;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 120px);
+      gap: 10px;
+      margin-top: 30px;
+      padding: 15px;
+      background-color: #333;
+      border-radius: 15px;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+    }
+    .cell {
+      width: 120px;
+      height: 120px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 2em;
+      font-weight: bold;
+      cursor: pointer;
+      background-color: #444;
+      color: #f0f0f0;
+      border-radius: 10px;
+      transition: transform 0.2s, background-color 0.3s;
+    }
+    .cell:hover { 
+      background-color: #555;
+      transform: scale(1.05);
+    }
+    .player-x { color: #4fa9f8; }
+    .player-o { color: #ff6b6b; }
+    #status { 
+      margin-top: 25px; 
+      font-size: 1.3em; 
+      color: #ddd; 
+      font-weight: bold;
+    }
+    #buttons {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+    }
+    #reset, #instructions {
+      padding: 10px 20px;
+      font-size: 1em;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+      box-shadow: 0px 4px 10px rgba(0, 123, 255, 0.3);
+      color: #fff;
+    }
+    #reset { background-color: #4fa9f8; }
+    #instructions { background-color: #ff6b6b; }
+    #reset:hover { background-color: #3a89d6; }
+    #instructions:hover { background-color: #d85656; }
+    #modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      visibility: hidden;
+      opacity: 0;
+      transition: visibility 0s, opacity 0.5s;
+    }
+    #modal-content {
+      background-color: #333;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 400px;
+      text-align: center;
+    }
+    #modal-content h2 {
+      margin: 0 0 10px;
+      color: #4fa9f8;
+    }
+    #modal-content p {
+      color: #ccc;
+      font-size: 1.1em;
+      line-height: 1.5;
+    }
+    #close-modal {
+      margin-top: 15px;
+      padding: 8px 16px;
+      font-size: 1em;
+      cursor: pointer;
+      background-color: #ff6b6b;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+    }
+    #close-modal:hover {
+      background-color: #d85656;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Jogo da Velha 3</h1>
+  <div id="board"></div>
+  <div id="status">Turno do jogador X</div>
+  <div id="buttons">
+    <button id="reset">Reiniciar Jogo</button>
+    <button id="instructions">Instruções</button>
+  </div>
+
+  <div id="modal">
+    <div id="modal-content">
+      <h2>Como jogar</h2>
+      <p>Este é um jogo da velha com uma diferença! Cada jogador pode ter no máximo 3 peças no tabuleiro. Se um jogador já tiver 3 peças, ele precisará remover uma peça antes de colocar outra.</p>
+      <p>Após as 3 peças de cada jogador estarem no tabuleiro, os jogadores podem mover suas peças para casas vazias. O jogo termina quando um jogador completa uma linha, coluna ou diagonal.</p>
+      <button id="close-modal">Fechar</button>
+    </div>
+  </div>
+
+  <script>
+    const boardElement = document.getElementById("board");
+    const statusElement = document.getElementById("status");
+    const resetButton = document.getElementById("reset");
+    const instructionsButton = document.getElementById("instructions");
+    const modal = document.getElementById("modal");
+    const closeModalButton = document.getElementById("close-modal");
+
+    let board = Array(9).fill(null);
+    let currentPlayer = "X";
+    let playerPieces = { X: 0, O: 0 };
+    const maxPieces = 3;
+    let gameOver = false;
+    const winningCombinations = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8],
+      [0, 3, 6], [1, 4, 7], [2, 5, 8],
+      [0, 4, 8], [2, 4, 6]
+    ];
+
+    function renderBoard() {
+      boardElement.innerHTML = "";
+      board.forEach((cell, index) => {
+        const cellElement = document.createElement("div");
+        cellElement.classList.add("cell");
+        cellElement.textContent = cell;
+        if (cell === "X") cellElement.classList.add("player-x");
+        if (cell === "O") cellElement.classList.add("player-o");
+        cellElement.addEventListener("click", () => handleMove(index));
+        boardElement.appendChild(cellElement);
+      });
+    }
+
+    function handleMove(index) {
+      if (gameOver) return;
+      if (board[index] === currentPlayer) {
+        board[index] = null;
+        playerPieces[currentPlayer]--;
+        renderBoard();
+        statusElement.textContent = `${currentPlayer}, mova sua peça para uma nova posição.`;
+      } else if (board[index] === null) {
+        if (playerPieces[currentPlayer] < maxPieces) {
+          board[index] = currentPlayer;
+          playerPieces[currentPlayer]++;
+        } else {
+          statusElement.textContent = `Jogador ${currentPlayer}, remova uma peça antes de colocar outra.`;
+          return;
+        }
+
+        if (checkWinner()) {
+          statusElement.textContent = `Jogador ${currentPlayer} venceu!`;
+          gameOver = true;
+        } else {
+          currentPlayer = currentPlayer === "X" ? "O" : "X";
+          statusElement.textContent = `Turno do jogador ${currentPlayer}`;
+        }
+      }
+      renderBoard();
+    }
+
+    function checkWinner() {
+      return winningCombinations.some(combination => {
+        const [a, b, c] = combination;
+        return board[a] && board[a] === board[b] && board[a] === board[c];
+      });
+    }
+
+    function resetGame() {
+      board.fill(null);
+      currentPlayer = "X";
+      playerPieces = { X: 0, O: 0 };
+      gameOver = false;
+      statusElement.textContent = "Turno do jogador X";
+      renderBoard();
+    }
+
+    resetButton.addEventListener("click", resetGame);
+
+    instructionsButton.addEventListener("click", () => {
+      modal.style.visibility = "visible";
+      modal.style.opacity = "1";
+    });
+
+    closeModalButton.addEventListener("click", () => {
+      modal.style.visibility = "hidden";
+      modal.style.opacity = "0";
+    });
+
+    renderBoard();
+  </script>
+
+</body>
+</html>
